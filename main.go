@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/bigbearsio/strength-ref2/cmd/strength-api/handlers"
   "github.com/gin-gonic/gin"
   "net/http"
 
@@ -36,6 +37,10 @@ func main() {
   router := gin.Default()
 
   routes := Routes{ db }
+  bookHandler := handlers.Book{
+    DB:db,
+    DBBucket:"Default",
+  }
   
   api := createSwaggerAPIDocs(&routes)
   api.Walk(func(path string, endpoint *swagger.Endpoint) {
@@ -46,6 +51,7 @@ func main() {
   })
   
   router.GET("/swagger.json", gin.WrapH(api.Handler(true)))
+  router.POST("/book",bookHandler.Book)
   router.Static("/swagger/", "swagger-ui")
 
   router.Run(":3000")
@@ -57,20 +63,12 @@ func createSwaggerAPIDocs(r *Routes) *swagger.API {
 		endpoint.Handler(r.Remaining),
 		endpoint.Response(http.StatusOK, RemainingSeats{}, "Remaining Seats"),
   )
-  
-  book := endpoint.New("post", "/book", "Reserve a seat",
-    endpoint.Handler(r.Book),
-    endpoint.Body(RequestSeat{}, "A seat to reserve", true),
-		endpoint.Response(http.StatusOK, ReservedSeat{}, "Reserved Seat"),
-	)
-
-
   apiDocs := swag.New(
-		swag.Endpoints(remaining, book),
+		swag.Endpoints(remaining),
   )
   
   return apiDocs
-} 
+}
 
 type RequestSeat struct {
   Seat string `json:"seat"`
@@ -91,44 +89,6 @@ type Routes struct {
   db *bolt.DB
 }
 
-func (r *Routes) Book(c *gin.Context) {
-  var request RequestSeat
-  var result ReservedSeat
-  now := time.Now()
-
-  c.BindJSON(&request)
-  err := r.db.Update(func(tx *bolt.Tx) error {
-    // Assume bucket exists and has keys
-    b := tx.Bucket([]byte(dbBucket))
-    v := b.Get([]byte(request.Seat))
-
-    if v == nil {
-      result = ReservedSeat{ false, "", 0 }
-      return nil
-    }
-    
-    var seating Seating
-    json.Unmarshal(v, &seating)
-
-    if seating.State(now) == Free {
-      newV := Seating{ getTimestamp(now) + timeLimitMS, false }
-      newVBytes, _ := json.Marshal(newV)
-      b.Put([]byte(request.Seat), newVBytes)
-
-      result = ReservedSeat{ true, request.Seat, newV.ExpireTimestamp }
-    } else {
-      result = ReservedSeat{ false, "", 0 }
-    }
-
-    return nil
-  })
-
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  c.JSON(http.StatusOK, result)
-}
 
 func (r *Routes) Remaining(c *gin.Context) {
   result := RemainingSeats{ }
