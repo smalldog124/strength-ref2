@@ -1,14 +1,13 @@
 package main
 
 import (
+	"github.com/bigbearsio/strength-ref2/internal/database"
 	"github.com/bigbearsio/strength-ref2/cmd/strength-api/handlers"
   "github.com/gin-gonic/gin"
   "net/http"
 
   "github.com/boltdb/bolt"
   "log"
-  "os"
-  "fmt"
   "time"
 
   "encoding/json"
@@ -18,20 +17,22 @@ import (
 	"github.com/savaki/swag/swagger"
 )
 
-const dbFile = "my.db"
 const dbBucket = "Default"
 
 const timeLimitMS = 10 * 1000
 
-const startRow = 'A'
-const endRow = 'B'
-const startCol = 0
-const endCol = 9
-
 //https://medium.com/@ribice/serve-swaggerui-within-your-golang-application-5486748a5ed4
 //https://github.com/savaki/swag/blob/master/examples/gin/main.go
 func main() {
-  db := initDB()
+  configDB := database.Config{
+    DBFile:"my.db",
+    DBBucket:"Default",
+    StartRow:'A',
+    EndRow:'B',
+    StartCol:0,
+    EndCol:9,
+  }
+  db := database.InitDB(configDB)
   defer db.Close()
 
   router := gin.Default()
@@ -154,44 +155,6 @@ func (s *Seating) State(now time.Time) SeatingState {
   } else {
     return Free
   }
-}
-
-func initDB() *bolt.DB {
-  // Delete and Re-create database
-  fileErr := os.Remove(dbFile)
-	if fileErr != nil {
-		log.Fatal(fileErr)
-  }
-
-  db, err := bolt.Open(dbFile, 0600, nil)
-	if err != nil {
-		log.Fatal(err)
-  }
-
-  // Populate Seats
-  err = db.Update(func(tx *bolt.Tx) error {
-    b, err := tx.CreateBucketIfNotExists([]byte(dbBucket))
-    if err != nil {
-      return fmt.Errorf("create bucket: %s", err)
-    }
-
-    for r:=startRow; r<=endRow; r++ {
-      for c:=startCol; c<=endCol; c++ {
-        key := []byte(fmt.Sprintf("%s%d", string(r), c))
-        value, _ := json.Marshal(Seating {0, false})
-
-        b.Put(key, value)
-      }
-    }
-
-    return nil
-  })
-
-  if err != nil {
-		log.Fatal(err)
-  }
-  
-  return db
 }
 
 
