@@ -24,6 +24,11 @@ type ReservedSeat struct {
 	ReserveExpiredTime int64  `json:reserve_expired_time,omitempty`
 }
 
+type RemainingSeats struct {
+	UnconfimedTicketsCount int      `json:"unconfimedTicketsCount"`
+	Seats                  []string `json:"seats"`
+}
+
 type Book struct {
 	DB       *bolt.DB
 	DBBucket string
@@ -57,6 +62,43 @@ func (b *Book) Book(c *gin.Context) {
 			result = ReservedSeat{true, request.Seat, newV.ExpireTimestamp}
 		} else {
 			result = ReservedSeat{false, "", 0}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+func (b *Book) Remaining(c *gin.Context) {
+	result := RemainingSeats{}
+	now := time.Now()
+
+	err := b.DB.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(b.DBBucket))
+
+		err := b.ForEach(func(k, v []byte) error {
+			var seating = book.Seating{}
+			json.Unmarshal(v, &seating)
+
+			if seating.State(now) == book.Reserved {
+				result.UnconfimedTicketsCount++
+			}
+
+			if len(result.Seats) < 10 && seating.State(now) == book.Free {
+				result.Seats = append(result.Seats, string(k))
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return err
 		}
 
 		return nil

@@ -5,13 +5,6 @@ import (
 	"github.com/bigbearsio/strength-ref2/cmd/strength-api/handlers"
   "github.com/gin-gonic/gin"
   "net/http"
-
-  "github.com/boltdb/bolt"
-  "log"
-  "time"
-
-  "encoding/json"
-
 	"github.com/savaki/swag"
 	"github.com/savaki/swag/endpoint"
 	"github.com/savaki/swag/swagger"
@@ -37,35 +30,41 @@ func main() {
 
   router := gin.Default()
 
-  routes := Routes{ db }
   bookHandler := handlers.Book{
     DB:db,
     DBBucket:"Default",
   }
   
-  api := createSwaggerAPIDocs(&routes)
-  api.Walk(func(path string, endpoint *swagger.Endpoint) {
-		h := endpoint.Handler.(func(c *gin.Context))
-		path = swag.ColonPath(path)
+  // api := createSwaggerAPIDocs(&bookHandler)
+  // api.Walk(func(path string, endpoint *swagger.Endpoint) {
+	// 	h := endpoint.Handler.(func(c *gin.Context))
+	// 	path = swag.ColonPath(path)
 
-		router.Handle(endpoint.Method, path, h)
-  })
+	// 	router.Handle(endpoint.Method, path, h)
+  // })
   
-  router.GET("/swagger.json", gin.WrapH(api.Handler(true)))
+  // router.GET("/swagger.json", gin.WrapH(api.Handler(true)))
   router.POST("/book",bookHandler.Book)
+  router.GET("/remaining",bookHandler.Remaining)
   router.Static("/swagger/", "swagger-ui")
 
   router.Run(":3000")
 }
 
 
-func createSwaggerAPIDocs(r *Routes) *swagger.API {
+func createSwaggerAPIDocs(r *handlers.Book) *swagger.API {
 	remaining := endpoint.New("get", "/remaining", "Get Remaining Seat(s)",
 		endpoint.Handler(r.Remaining),
 		endpoint.Response(http.StatusOK, RemainingSeats{}, "Remaining Seats"),
   )
+  book := endpoint.New("post", "/book", "Reserve a seat",
+    endpoint.Handler(r.Book),
+    endpoint.Body(RequestSeat{}, "A seat to reserve", true),
+		endpoint.Response(http.StatusOK, ReservedSeat{}, "Reserved Seat"),
+	)
+
   apiDocs := swag.New(
-		swag.Endpoints(remaining),
+		swag.Endpoints(remaining, book),
   )
   
   return apiDocs
@@ -86,79 +85,3 @@ type RemainingSeats struct {
   Seats []string `json:"seats"`
 }
 
-type Routes struct {
-  db *bolt.DB
-}
-
-
-func (r *Routes) Remaining(c *gin.Context) {
-  result := RemainingSeats{ }
-  now := time.Now()
-
-  err := r.db.View(func(tx *bolt.Tx) error {
-    // Assume bucket exists and has keys
-    b := tx.Bucket([]byte(dbBucket))
-  
-
-    err := b.ForEach(func(k, v []byte) error {
-      var seating = Seating{}
-      json.Unmarshal(v, &seating)
-
-      if seating.State(now) == Reserved {
-        result.UnconfimedTicketsCount++
-      }
-      
-      if len(result.Seats) < 10 && seating.State(now) == Free {
-        result.Seats = append(result.Seats, string(k))
-      }
-      
-      return nil
-    })
-
-    if err != nil {
-      return err
-    }
-
-    return nil
-  })
-
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  c.JSON(http.StatusOK, result)
-}
-
-
-///// DB //////
-
-type SeatingState int
-const (
-  Free      SeatingState = 0
-  Reserved  SeatingState = 1
-  Booked    SeatingState = 2
-)
-
-
-type Seating struct {
-  ExpireTimestamp int64 `json:"expireTimestamp"`
-  Booked bool `json:"booked"`
-}
-
-func (s *Seating) State(now time.Time) SeatingState {
-  if s.Booked { 
-    return Booked
-  }
-
-  if s.ExpireTimestamp > 0 && (getTimestamp(now) - s.ExpireTimestamp) < timeLimitMS   {
-    return Reserved
-  } else {
-    return Free
-  }
-}
-
-
-//// Funcs ////
-func getTimestamp(d time.Time) int64 {
-  return d.UnixNano() / int64(time.Millisecond)
-}
