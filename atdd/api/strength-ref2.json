@@ -1,0 +1,102 @@
+{
+	"info": {
+		"_postman_id": "c02c78e2-5f38-4aba-a63e-93055b14da78",
+		"name": "strength-ref2",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "remaining",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "6a64a38c-f57c-4fc5-9beb-55dbb0d23581",
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"unconfimedTicketsCount is 0\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.unconfimedTicketsCount).to.eql(0);",
+							"});",
+							"pm.test(\"seats array index 0 is A0\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.seats[0]).to.eql(\"A0\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "{{url}}/remaining",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"remaining"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "book",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "296bfb43-6a2c-48ba-b40b-11e8cfd54a11",
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Success status is true\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.Success).to.eql(true);",
+							"});",
+							"pm.test(\"Seat is A0\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.Seat).to.eql(\"A0\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"seat\": \"A0\"\n}"
+				},
+				"url": {
+					"raw": "{{url}}/book",
+					"host": [
+						"{{url}}"
+					],
+					"path": [
+						"book"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
