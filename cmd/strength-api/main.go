@@ -8,15 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const dbBucket = "Default"
-
-const timeLimitMS = 10 * 1000
+const pathFileDB = "./internal/database/my.db"
 
 //https://medium.com/@ribice/serve-swaggerui-within-your-golang-application-5486748a5ed4
 //https://github.com/savaki/swag/blob/master/examples/gin/main.go
 func main() {
 	configDB := database.Config{
-		DBFile:   "my.db",
+		DBFile:   pathFileDB,
 		DBBucket: "Default",
 		StartRow: 'A',
 		EndRow:   'B',
